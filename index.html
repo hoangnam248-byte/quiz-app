@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Quiz PRO MAX</title>
+<title>Quiz PRO FINAL</title>
 
 <style>
 body { margin:0; font-family:Arial; display:flex; }
@@ -18,8 +18,9 @@ body { margin:0; font-family:Arial; display:flex; }
   background:#ddd;
 }
 
-.answered { background:#4caf50; color:white; }
 .current { background:#2196f3; color:white; }
+.correct-btn { background:#4caf50; color:white; }
+.wrong-btn { background:#f44336; color:white; }
 
 #main { flex:1; padding:20px; }
 
@@ -29,15 +30,30 @@ body { margin:0; font-family:Arial; display:flex; }
   cursor:pointer;
 }
 
-.selected { background:#2196f3; color:white; }
 .correct { background:#4caf50; color:white; }
 .wrong { background:#f44336; color:white; }
 
 .topbar { display:flex; justify-content:space-between; }
 
+#progress {
+  height:10px;
+  background:#ddd;
+  border-radius:5px;
+  margin:10px 0;
+}
+
+#progress-bar {
+  height:10px;
+  background:#4caf50;
+  width:0%;
+  border-radius:5px;
+}
+
 button {
-  padding:8px 12px; border:none;
-  border-radius:6px; cursor:pointer;
+  padding:8px 12px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
 }
 </style>
 </head>
@@ -47,54 +63,40 @@ button {
 <div id="sidebar"></div>
 
 <div id="main">
-  <div id="login"></div>
+  <h2>Quiz PRO</h2>
+
+  <!-- chọn chế độ -->
+  <div>
+    <button onclick="startMode('practice')">Luyện tập</button>
+    <button onclick="startMode('exam')">Thi thật</button>
+    <button onclick="redoWrong()">Làm lại câu sai</button>
+  </div>
+
+  <div id="progress"><div id="progress-bar"></div></div>
+
   <div id="app"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <script>
-let user = localStorage.getItem("user");
 let questions = [];
 let current = 0;
 let answers = {};
 let wrongList = [];
-let time = 1800;
+let time = 3600;
 let timer;
+let mode = "practice"; // practice | exam
 let finished = false;
 
-function renderLogin(){
-  if(user){
-    document.getElementById("login").innerHTML = `
-      👤 ${user}
-      <button onclick="logout()">Logout</button>
-      <button onclick="viewHistory()">Lịch sử</button>
-      <hr>
-      <button onclick="loadExcel()">Bắt đầu thi</button>
-      <button onclick="redoWrong()">Làm lại câu sai</button>
-    `;
-  } else {
-    document.getElementById("login").innerHTML = `
-      <input id="username" placeholder="Nhập tên">
-      <button onclick="login()">Login</button>
-    `;
-  }
+async function startMode(m){
+  mode = m;
+  await loadExcel();
 }
 
-function login(){
-  user = document.getElementById("username").value;
-  localStorage.setItem("user", user);
-  renderLogin();
-}
-
-function logout(){
-  localStorage.removeItem("user");
-  location.reload();
-}
-
-// LOAD EXCEL
 async function loadExcel(){
   const url = "https://raw.githubusercontent.com/hoangnam248-byte/quiz-app/main/data.xlsx";
+
   const res = await fetch(url);
   const buffer = await res.arrayBuffer();
 
@@ -113,40 +115,38 @@ async function loadExcel(){
   }));
 
   questions.sort(()=>Math.random()-0.5);
+  questions = questions.slice(0,70); // 70 câu
 
   startQuiz();
 }
 
 function startQuiz(){
   answers = {};
+  wrongList = [];
+  current = 0;
   finished = false;
-  time = 1800;
+  time = 3600;
 
+  clearInterval(timer);
   timer = setInterval(()=>{
     time--;
     render();
   },1000);
 
-  renderSidebar();
   render();
 }
 
-// SIDEBAR
-function renderSidebar(){
-  const sb = document.getElementById("sidebar");
-  sb.innerHTML = questions.map((q,i)=>`
-    <button class="q-btn ${answers[i]?'answered':''} ${i===current?'current':''}"
-      onclick="go(${i})">${i+1}</button>
-  `).join("");
-}
-
-// MAIN
 function render(){
   const app = document.getElementById("app");
 
   if(time<=0){ submit(); return; }
 
   const q = questions[current];
+
+  // progress %
+  const done = Object.keys(answers).length;
+  const percent = Math.floor((done/questions.length)*100);
+  document.getElementById("progress-bar").style.width = percent+"%";
 
   app.innerHTML = `
     <div class="topbar">
@@ -158,11 +158,14 @@ function render(){
 
     ${["A","B","C","D"].map(k=>{
       let cls="answer";
-      if(answers[current]===k) cls+=" selected";
 
-      if(finished){
+      if(mode==="practice" && answers[current]){
         if(k===q.correct) cls+=" correct";
-        else if(answers[current]===k) cls+=" wrong";
+        if(answers[current]===k && k!==q.correct) cls+=" wrong";
+      }
+
+      if(mode==="exam" && answers[current]===k){
+        cls+=" correct-btn";
       }
 
       return `<div class="${cls}" onclick="select('${k}')">
@@ -178,8 +181,29 @@ function render(){
   renderSidebar();
 }
 
+function renderSidebar(){
+  const sb = document.getElementById("sidebar");
+
+  sb.innerHTML = questions.map((q,i)=>{
+    let cls="q-btn";
+
+    if(i===current) cls+=" current";
+
+    if(mode==="practice" && answers[i]){
+      if(answers[i]===q.correct) cls+=" correct-btn";
+      else cls+=" wrong-btn";
+    }
+
+    if(mode==="exam" && answers[i]){
+      cls+=" correct-btn";
+    }
+
+    return `<button class="${cls}" onclick="go(${i})">${i+1}</button>`;
+  }).join("");
+}
+
 function select(k){
-  if(finished) return;
+  if(mode==="practice" && answers[current]) return;
   answers[current]=k;
   render();
 }
@@ -188,60 +212,34 @@ function next(){ if(current<questions.length-1) current++; render(); }
 function prev(){ if(current>0) current--; render(); }
 function go(i){ current=i; render(); }
 
-// SUBMIT
 function submit(){
-  finished = true;
+  finished=true;
   clearInterval(timer);
 
   let score=0;
-  wrongList = [];
+  wrongList=[];
 
   questions.forEach((q,i)=>{
     if(answers[i]===q.correct) score++;
     else wrongList.push(q);
   });
 
-  // SAVE HISTORY
-  let history = JSON.parse(localStorage.getItem("history")||"[]");
-  history.push({
-    user, score,
-    total: questions.length,
-    time: new Date().toLocaleString()
-  });
-  localStorage.setItem("history", JSON.stringify(history));
-
-  render();
-
-  document.getElementById("app").innerHTML += `
-    <h2>Điểm: ${score}/${questions.length}</h2>
+  document.getElementById("app").innerHTML = `
+    <h2>Kết quả</h2>
+    <h3>${score}/${questions.length}</h3>
     <button onclick="redoWrong()">Làm lại câu sai</button>
   `;
 }
 
-// LÀM LẠI SAI
 function redoWrong(){
   if(wrongList.length===0){
-    alert("Chưa có dữ liệu sai");
+    alert("Không có câu sai!");
     return;
   }
   questions = wrongList;
   current=0;
   startQuiz();
 }
-
-// LỊCH SỬ
-function viewHistory(){
-  let history = JSON.parse(localStorage.getItem("history")||"[]");
-
-  document.getElementById("app").innerHTML = `
-    <h2>Lịch sử</h2>
-    ${history.map(h=>`
-      <div>👤 ${h.user} - ${h.score}/${h.total} (${h.time})</div>
-    `).join("")}
-  `;
-}
-
-renderLogin();
 </script>
 
 </body>
