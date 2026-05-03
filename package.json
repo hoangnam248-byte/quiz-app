@@ -1,0 +1,11 @@
+{
+  "name": "quiz-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo build ok"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}
