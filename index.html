@@ -2,69 +2,44 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Quiz PRO</title>
+<title>Quiz PRO MAX</title>
 
 <style>
-body {
-  font-family: Arial;
-  margin: 0;
-  display: flex;
-}
+body { margin:0; font-family:Arial; display:flex; }
 
 #sidebar {
-  width: 250px;
-  height: 100vh;
-  overflow-y: auto;
-  background: #f4f4f4;
-  padding: 10px;
-  border-right: 1px solid #ddd;
+  width:250px; height:100vh; overflow:auto;
+  background:#f4f4f4; padding:10px;
 }
 
 .q-btn {
-  width: 40px;
-  height: 40px;
-  margin: 5px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  background: #ddd;
+  width:40px; height:40px; margin:5px;
+  border:none; border-radius:6px; cursor:pointer;
+  background:#ddd;
 }
 
-.answered { background: #4caf50; color: white; }
-.current { background: #2196f3; color: white; }
+.answered { background:#4caf50; color:white; }
+.current { background:#2196f3; color:white; }
 
-#main {
-  flex: 1;
-  padding: 20px;
-}
+#main { flex:1; padding:20px; }
 
 .answer {
-  display: block;
-  margin: 10px 0;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  cursor: pointer;
+  padding:10px; margin:10px 0;
+  border-radius:8px; border:1px solid #ccc;
+  cursor:pointer;
 }
 
-.selected { background: #2196f3; color: white; }
-.correct { background: #4caf50; color: white; }
-.wrong { background: #f44336; color: white; }
+.selected { background:#2196f3; color:white; }
+.correct { background:#4caf50; color:white; }
+.wrong { background:#f44336; color:white; }
 
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
+.topbar { display:flex; justify-content:space-between; }
 
 button {
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
+  padding:8px 12px; border:none;
+  border-radius:6px; cursor:pointer;
 }
 </style>
-
 </head>
 
 <body>
@@ -72,29 +47,59 @@ button {
 <div id="sidebar"></div>
 
 <div id="main">
-  <h2>Quiz PRO</h2>
-  <button onclick="loadExcel()">Bắt đầu thi</button>
+  <div id="login"></div>
   <div id="app"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <script>
+let user = localStorage.getItem("user");
 let questions = [];
 let current = 0;
 let answers = {};
+let wrongList = [];
 let time = 1800;
 let timer;
 let finished = false;
 
+function renderLogin(){
+  if(user){
+    document.getElementById("login").innerHTML = `
+      👤 ${user}
+      <button onclick="logout()">Logout</button>
+      <button onclick="viewHistory()">Lịch sử</button>
+      <hr>
+      <button onclick="loadExcel()">Bắt đầu thi</button>
+      <button onclick="redoWrong()">Làm lại câu sai</button>
+    `;
+  } else {
+    document.getElementById("login").innerHTML = `
+      <input id="username" placeholder="Nhập tên">
+      <button onclick="login()">Login</button>
+    `;
+  }
+}
+
+function login(){
+  user = document.getElementById("username").value;
+  localStorage.setItem("user", user);
+  renderLogin();
+}
+
+function logout(){
+  localStorage.removeItem("user");
+  location.reload();
+}
+
+// LOAD EXCEL
 async function loadExcel(){
   const url = "https://raw.githubusercontent.com/hoangnam248-byte/quiz-app/main/data.xlsx";
-
   const res = await fetch(url);
-  const arrayBuffer = await res.arrayBuffer();
+  const buffer = await res.arrayBuffer();
 
-  const workbook = XLSX.read(arrayBuffer, {type:'array'});
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const wb = XLSX.read(buffer, {type:'array'});
+  const sheet = wb.Sheets[wb.SheetNames[0]];
   const json = XLSX.utils.sheet_to_json(sheet);
 
   questions = json.map((r,i)=>({
@@ -107,12 +112,16 @@ async function loadExcel(){
     correct:r["Đáp án đúng"]
   }));
 
-  questions.sort(() => Math.random() - 0.5);
+  questions.sort(()=>Math.random()-0.5);
 
   startQuiz();
 }
 
 function startQuiz(){
+  answers = {};
+  finished = false;
+  time = 1800;
+
   timer = setInterval(()=>{
     time--;
     render();
@@ -122,22 +131,20 @@ function startQuiz(){
   render();
 }
 
+// SIDEBAR
 function renderSidebar(){
-  const sb = document.getElementById('sidebar');
-
+  const sb = document.getElementById("sidebar");
   sb.innerHTML = questions.map((q,i)=>`
     <button class="q-btn ${answers[i]?'answered':''} ${i===current?'current':''}"
       onclick="go(${i})">${i+1}</button>
   `).join("");
 }
 
+// MAIN
 function render(){
-  const app = document.getElementById('app');
+  const app = document.getElementById("app");
 
-  if(time<=0){
-    clearInterval(timer);
-    return showResult();
-  }
+  if(time<=0){ submit(); return; }
 
   const q = questions[current];
 
@@ -150,12 +157,12 @@ function render(){
     <h3>${q.question}</h3>
 
     ${["A","B","C","D"].map(k=>{
-      let cls = "answer";
-      if(answers[current]===k) cls += " selected";
+      let cls="answer";
+      if(answers[current]===k) cls+=" selected";
 
       if(finished){
-        if(k===q.correct) cls += " correct";
-        else if(answers[current]===k) cls += " wrong";
+        if(k===q.correct) cls+=" correct";
+        else if(answers[current]===k) cls+=" wrong";
       }
 
       return `<div class="${cls}" onclick="select('${k}')">
@@ -163,11 +170,9 @@ function render(){
       </div>`;
     }).join("")}
 
-    <div style="margin-top:20px">
-      <button onclick="prev()">⬅</button>
-      <button onclick="next()">➡</button>
-      <button onclick="submit()">Nộp bài</button>
-    </div>
+    <button onclick="prev()">⬅</button>
+    <button onclick="next()">➡</button>
+    <button onclick="submit()">Nộp bài</button>
   `;
 
   renderSidebar();
@@ -179,39 +184,64 @@ function select(k){
   render();
 }
 
-function next(){
-  if(current<questions.length-1) current++;
-  render();
-}
+function next(){ if(current<questions.length-1) current++; render(); }
+function prev(){ if(current>0) current--; render(); }
+function go(i){ current=i; render(); }
 
-function prev(){
-  if(current>0) current--;
-  render();
-}
-
-function go(i){
-  current=i;
-  render();
-}
-
+// SUBMIT
 function submit(){
   finished = true;
   clearInterval(timer);
-  render();
-}
 
-function showResult(){
   let score=0;
+  wrongList = [];
+
   questions.forEach((q,i)=>{
     if(answers[i]===q.correct) score++;
+    else wrongList.push(q);
   });
 
-  document.getElementById('app').innerHTML = `
-    <h2>Kết quả</h2>
-    <h3>${score}/${questions.length}</h3>
-    <button onclick="location.reload()">Làm lại</button>
+  // SAVE HISTORY
+  let history = JSON.parse(localStorage.getItem("history")||"[]");
+  history.push({
+    user, score,
+    total: questions.length,
+    time: new Date().toLocaleString()
+  });
+  localStorage.setItem("history", JSON.stringify(history));
+
+  render();
+
+  document.getElementById("app").innerHTML += `
+    <h2>Điểm: ${score}/${questions.length}</h2>
+    <button onclick="redoWrong()">Làm lại câu sai</button>
   `;
 }
+
+// LÀM LẠI SAI
+function redoWrong(){
+  if(wrongList.length===0){
+    alert("Chưa có dữ liệu sai");
+    return;
+  }
+  questions = wrongList;
+  current=0;
+  startQuiz();
+}
+
+// LỊCH SỬ
+function viewHistory(){
+  let history = JSON.parse(localStorage.getItem("history")||"[]");
+
+  document.getElementById("app").innerHTML = `
+    <h2>Lịch sử</h2>
+    ${history.map(h=>`
+      <div>👤 ${h.user} - ${h.score}/${h.total} (${h.time})</div>
+    `).join("")}
+  `;
+}
+
+renderLogin();
 </script>
 
 </body>
