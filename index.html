@@ -25,9 +25,10 @@ body { margin:0; font-family:Arial; display:flex; }
 #main { flex:1; padding:20px; }
 
 .answer {
-  padding:10px; margin:10px 0;
+  padding:12px; margin:10px 0;
   border-radius:8px; border:1px solid #ccc;
   cursor:pointer;
+  font-size:16px;
 }
 
 .correct { background:#4caf50; color:white; }
@@ -37,6 +38,7 @@ body { margin:0; font-family:Arial; display:flex; }
   display:flex;
   justify-content:space-between;
   font-weight:bold;
+  font-size:16px;
 }
 
 #progress {
@@ -51,6 +53,14 @@ body { margin:0; font-family:Arial; display:flex; }
   background:#4caf50;
   width:0%;
   border-radius:5px;
+}
+
+/* 🔥 NÚT TO GẤP 3 */
+.big-btn {
+  padding:20px 30px;
+  font-size:20px;
+  margin:10px;
+  border-radius:10px;
 }
 
 button {
@@ -83,6 +93,7 @@ button {
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <script>
+let allQuestions = [];
 let questions = [];
 let current = 0;
 let answers = {};
@@ -91,7 +102,7 @@ let time = 3600;
 let timer;
 let mode = "practice";
 
-// 👉 TÍNH ĐIỂM REALTIME
+// 👉 điểm realtime
 function getScore(){
   let score = 0;
   questions.forEach((q,i)=>{
@@ -115,7 +126,7 @@ async function loadExcel(){
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const json = XLSX.utils.sheet_to_json(sheet);
 
-  questions = json.map((r,i)=>({
+  allQuestions = json.map((r,i)=>({
     id:i,
     question:r["Câu hỏi"],
     A:r["Đáp án A"],
@@ -125,8 +136,12 @@ async function loadExcel(){
     correct:r["Đáp án đúng"]
   }));
 
-  questions.sort(()=>Math.random()-0.5);
-  questions = questions.slice(0,70);
+  // 🔥 PHÂN CHẾ ĐỘ
+  if(mode === "practice"){
+    questions = [...allQuestions]; // 390 câu
+  } else {
+    questions = [...allQuestions].sort(()=>Math.random()-0.5).slice(0,70);
+  }
 
   startQuiz();
 }
@@ -170,13 +185,11 @@ function render(){
     ${["A","B","C","D"].map(k=>{
       let cls="answer";
 
-      // 👉 Luyện tập: hiện đúng sai ngay
       if(mode==="practice" && answers[current]){
         if(k===q.correct) cls+=" correct";
         if(answers[current]===k && k!==q.correct) cls+=" wrong";
       }
 
-      // 👉 Thi thật: chỉ highlight đã chọn
       if(mode==="exam" && answers[current]===k){
         cls+=" correct-btn";
       }
@@ -186,9 +199,11 @@ function render(){
       </div>`;
     }).join("")}
 
-    <button onclick="prev()">⬅</button>
-    <button onclick="next()">➡</button>
-    <button onclick="submit()">Nộp bài</button>
+    <div>
+      <button class="big-btn" onclick="prev()">⬅</button>
+      <button class="big-btn" onclick="next()">➡</button>
+      <button onclick="submit()">Nộp bài</button>
+    </div>
   `;
 
   renderSidebar();
