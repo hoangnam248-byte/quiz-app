@@ -7,25 +7,54 @@
 
 <style>
 body { margin:0; font-family:Arial; background:#f5f5f5; }
-.dark { background:#121212; color:#fff; }
 
+/* HEADER */
 .header {
   position:fixed; top:0; left:0; right:0;
   background:white; padding:10px;
+  z-index:10;
   box-shadow:0 2px 5px rgba(0,0,0,0.1);
 }
-.dark .header { background:#1e1e1e; }
 
+/* SIDEBAR */
+#sidebar {
+  position:fixed;
+  left:-100%;
+  top:0;
+  width:80%;
+  height:100%;
+  background:white;
+  overflow:auto;
+  transition:0.3s;
+  z-index:20;
+  padding:10px;
+}
+#sidebar.open { left:0; }
+
+.q-btn {
+  width:40px; height:40px;
+  margin:5px;
+  border:none;
+  border-radius:6px;
+  background:#ddd;
+}
+
+.current { background:#2196f3; color:white; }
+.correct-btn { background:#4caf50; color:white; }
+.wrong-btn { background:#f44336; color:white; }
+.bookmark-btn { border:2px solid gold; }
+
+/* CONTENT */
 .container { padding:80px 15px 120px; }
 
 .answer {
   padding:15px; margin:10px 0;
-  border-radius:10px; border:1px solid #ddd;
+  border-radius:10px;
+  border:1px solid #ddd;
 }
 
 .correct { background:#4caf50; color:white; }
 .wrong { background:#f44336; color:white; }
-.bookmark { border:2px solid gold; }
 
 .nav {
   position:fixed; bottom:0; left:0; right:0;
@@ -36,16 +65,25 @@ body { margin:0; font-family:Arial; background:#f5f5f5; }
   font-size:18px;
 }
 
-.progress { height:6px; background:#ddd; }
-.bar { height:6px; background:#4caf50; width:0%; }
+/* MENU */
+.menu {
+  position:fixed;
+  top:15px;
+  left:10px;
+  font-size:20px;
+  z-index:30;
+}
 </style>
 </head>
 
 <body>
 
+<div class="menu" onclick="toggleSidebar()">☰</div>
+
+<div id="sidebar"></div>
+
 <div class="header">
   <div id="info"></div>
-  <div class="progress"><div id="bar" class="bar"></div></div>
 </div>
 
 <div class="container" id="app"></div>
@@ -59,53 +97,32 @@ body { margin:0; font-family:Arial; background:#f5f5f5; }
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <script>
-// ================= STATE =================
-let allQuestions = [];
-let questions = [];
-let answers = {};
-let bookmarks = {};
-let wrongList = [];
-let current = 0;
-let mode = "practice";
+let allQuestions=[];
+let questions=[];
+let answers={};
+let bookmarks={};
+let wrongList=[];
+let current=0;
+let mode="practice";
 let user = localStorage.getItem("user") || prompt("Nhập tên:");
 localStorage.setItem("user", user);
 
-let time = 3600;
-let timer;
-
-// ================= SOUND =================
-function playSound(type){
-  let audio = new Audio(type==="correct"
-    ? "https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"
-    : "https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
-  audio.play();
+// TOGGLE SIDEBAR
+function toggleSidebar(){
+  document.getElementById("sidebar").classList.toggle("open");
 }
 
-// ================= VIBRATE =================
-function vibrate(){
-  if(navigator.vibrate) navigator.vibrate(100);
-}
-
-// ================= SCORE =================
-function getScore(){
-  let s=0;
-  questions.forEach((q,i)=>{
-    if(answers[i]===q.correct) s++;
-  });
-  return s;
-}
-
-// ================= LOAD =================
+// LOAD
 async function loadExcel(){
-  const url = "https://raw.githubusercontent.com/hoangnam248-byte/quiz-app/main/data.xlsx";
-  const res = await fetch(url);
-  const buf = await res.arrayBuffer();
+  const url="https://raw.githubusercontent.com/hoangnam248-byte/quiz-app/main/data.xlsx";
+  const res=await fetch(url);
+  const buf=await res.arrayBuffer();
 
-  const wb = XLSX.read(buf,{type:'array'});
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const json = XLSX.utils.sheet_to_json(sheet);
+  const wb=XLSX.read(buf,{type:'array'});
+  const sheet=wb.Sheets[wb.SheetNames[0]];
+  const json=XLSX.utils.sheet_to_json(sheet);
 
-  allQuestions = json.map((r)=>({
+  allQuestions=json.map(r=>({
     question:r["Câu hỏi"],
     A:r["Đáp án A"],
     B:r["Đáp án B"],
@@ -114,38 +131,41 @@ async function loadExcel(){
     correct:r["Đáp án đúng"]
   }));
 
-  startQuiz();
+  startMode("practice");
 }
 
-// ================= START =================
-function startQuiz(){
-  if(mode==="practice"){
-    questions = [...allQuestions];
-  } else {
-    questions = [...allQuestions].sort(()=>Math.random()-0.5).slice(0,70);
+// MODE
+function startMode(m){
+  mode=m;
+  answers={};
+  current=0;
+
+  if(m==="practice"){
+    questions=[...allQuestions];
+  } else if(m==="exam"){
+    questions=[...allQuestions].sort(()=>Math.random()-0.5).slice(0,70);
+  } else if(m==="wrong"){
+    questions=[...wrongList];
   }
-
-  answers = JSON.parse(localStorage.getItem("answers")||"{}");
-  current = 0;
-
-  clearInterval(timer);
-  timer = setInterval(()=>{
-    time--;
-    render();
-  },1000);
 
   render();
 }
 
-// ================= RENDER =================
+// SCORE
+function getScore(){
+  let s=0;
+  questions.forEach((q,i)=>{
+    if(answers[i]===q.correct) s++;
+  });
+  return s;
+}
+
+// RENDER
 function render(){
-  const q = questions[current];
+  const q=questions[current];
 
   document.getElementById("info").innerHTML =
-    `${user} | Câu ${current+1}/${questions.length} | Điểm: ${getScore()}`;
-
-  document.getElementById("bar").style.width =
-    (Object.keys(answers).length/questions.length*100)+"%";
+    `${user} | ${mode.toUpperCase()} | Câu ${current+1}/${questions.length} | Điểm: ${getScore()}`;
 
   document.getElementById("app").innerHTML = `
     <h3>${q.question}</h3>
@@ -164,118 +184,72 @@ function render(){
     }).join("")}
 
     <button onclick="toggleBookmark()">⭐ Bookmark</button>
-    <button onclick="jumpUnanswered()">⏭️ Câu chưa làm</button>
-    <button onclick="toggleDark()">🌙 Dark</button>
+
+    <hr>
+
+    <button onclick="startMode('practice')">🎯 Luyện tập</button>
+    <button onclick="startMode('exam')">📝 Thi thật</button>
+    <button onclick="startMode('wrong')">🔁 Câu sai</button>
+  `;
+
+  renderSidebar();
+}
+
+// SIDEBAR
+function renderSidebar(){
+  const sb=document.getElementById("sidebar");
+
+  sb.innerHTML = `
+    <h3>Menu</h3>
+    <button onclick="startMode('practice')">🎯 Luyện tập</button>
+    <button onclick="startMode('exam')">📝 Thi thật</button>
+    <button onclick="startMode('wrong')">🔁 Câu sai</button>
+    <hr>
+    ${questions.map((q,i)=>{
+      let cls="q-btn";
+
+      if(i===current) cls+=" current";
+
+      if(bookmarks[i]) cls+=" bookmark-btn";
+
+      if(answers[i]){
+        if(answers[i]===q.correct) cls+=" correct-btn";
+        else cls+=" wrong-btn";
+      }
+
+      return `<button class="${cls}" onclick="go(${i})">${i+1}</button>`;
+    }).join("")}
   `;
 }
 
-// ================= ACTION =================
+// ACTION
 function select(k){
   if(answers[current]) return;
-
   answers[current]=k;
-  localStorage.setItem("answers", JSON.stringify(answers));
-
-  if(k===questions[current].correct){
-    playSound("correct");
-  } else {
-    playSound("wrong");
-  }
-
-  vibrate();
   render();
 }
 
 function next(){ if(current<questions.length-1) current++; render(); }
 function prev(){ if(current>0) current--; render(); }
+function go(i){ current=i; toggleSidebar(); render(); }
 
 function toggleBookmark(){
   bookmarks[current]=!bookmarks[current];
   render();
 }
 
-function jumpUnanswered(){
-  for(let i=0;i<questions.length;i++){
-    if(!answers[i]){ current=i; break; }
-  }
-  render();
-}
-
-// ================= SUBMIT =================
+// SUBMIT
 function submit(){
-  clearInterval(timer);
-
-  let score = getScore();
-
-  // save history
-  let history = JSON.parse(localStorage.getItem("history")||"[]");
-  history.push({
-    user, score,
-    total:questions.length,
-    time:new Date().toLocaleString()
-  });
-  localStorage.setItem("history", JSON.stringify(history));
-
+  let score=getScore();
   wrongList = questions.filter((q,i)=>answers[i]!==q.correct);
 
   document.getElementById("app").innerHTML = `
     <h2>Kết quả</h2>
     <h3>${score}/${questions.length}</h3>
-
-    <canvas id="chart" width="300" height="200"></canvas>
-
-    <button onclick="redoWrong()">Làm lại câu sai</button>
-    <button onclick="viewDetail()">Xem chi tiết</button>
-    <button onclick="viewHistory()">Lịch sử</button>
+    <button onclick="startMode('wrong')">🔁 Làm lại câu sai</button>
   `;
-
-  drawChart(score);
 }
 
-// ================= CHART =================
-function drawChart(score){
-  const c = document.getElementById("chart");
-  const ctx = c.getContext("2d");
-
-  ctx.fillStyle="green";
-  ctx.fillRect(50,200-score*3,50,score*3);
-
-  ctx.fillStyle="red";
-  ctx.fillRect(150,200-(questions.length-score)*3,50,(questions.length-score)*3);
-}
-
-// ================= DETAIL =================
-function viewDetail(){
-  document.getElementById("app").innerHTML =
-    questions.map((q,i)=>`
-      <div>
-        ${i+1}. ${q.question} <br>
-        ✔ ${q.correct} | Bạn chọn: ${answers[i]||"-"}
-      </div><hr>
-    `).join("");
-}
-
-// ================= HISTORY =================
-function viewHistory(){
-  let h = JSON.parse(localStorage.getItem("history")||"[]");
-  document.getElementById("app").innerHTML =
-    h.map(x=>`👤 ${x.user} - ${x.score}/${x.total} (${x.time})`).join("<br>");
-}
-
-// ================= REDO =================
-function redoWrong(){
-  questions = wrongList;
-  answers={};
-  current=0;
-  render();
-}
-
-// ================= DARK =================
-function toggleDark(){
-  document.body.classList.toggle("dark");
-}
-
-// ================= INIT =================
 loadExcel();
 </script>
 
