@@ -1,16 +1,81 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Quiz App</title>
+<meta charset="UTF-8">
+<title>Quiz PRO</title>
+
+<style>
+body {
+  font-family: Arial;
+  margin: 0;
+  display: flex;
+}
+
+#sidebar {
+  width: 250px;
+  height: 100vh;
+  overflow-y: auto;
+  background: #f4f4f4;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.q-btn {
+  width: 40px;
+  height: 40px;
+  margin: 5px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #ddd;
+}
+
+.answered { background: #4caf50; color: white; }
+.current { background: #2196f3; color: white; }
+
+#main {
+  flex: 1;
+  padding: 20px;
+}
+
+.answer {
+  display: block;
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+}
+
+.selected { background: #2196f3; color: white; }
+.correct { background: #4caf50; color: white; }
+.wrong { background: #f44336; color: white; }
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+button {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+</style>
+
 </head>
 
-<body style="font-family: Arial; padding:20px">
+<body>
 
-<h2>Thi trắc nghiệm</h2>
-<button onclick="loadExcel()">Bắt đầu thi</button>
+<div id="sidebar"></div>
 
-<div id="app" style="margin-top:20px"></div>
+<div id="main">
+  <h2>Quiz PRO</h2>
+  <button onclick="loadExcel()">Bắt đầu thi</button>
+  <div id="app"></div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
@@ -20,8 +85,8 @@ let current = 0;
 let answers = {};
 let time = 1800;
 let timer;
+let finished = false;
 
-// 🔥 LOAD EXCEL TỪ GITHUB
 async function loadExcel(){
   const url = "https://raw.githubusercontent.com/hoangnam248-byte/quiz-app/main/data.xlsx";
 
@@ -42,22 +107,30 @@ async function loadExcel(){
     correct:r["Đáp án đúng"]
   }));
 
-  // random câu hỏi
   questions.sort(() => Math.random() - 0.5);
 
   startQuiz();
 }
 
-// ⏱️ TIMER
 function startQuiz(){
   timer = setInterval(()=>{
     time--;
     render();
   },1000);
+
+  renderSidebar();
   render();
 }
 
-// 🧠 HIỂN THỊ
+function renderSidebar(){
+  const sb = document.getElementById('sidebar');
+
+  sb.innerHTML = questions.map((q,i)=>`
+    <button class="q-btn ${answers[i]?'answered':''} ${i===current?'current':''}"
+      onclick="go(${i})">${i+1}</button>
+  `).join("");
+}
+
 function render(){
   const app = document.getElementById('app');
 
@@ -69,51 +142,64 @@ function render(){
   const q = questions[current];
 
   app.innerHTML = `
-    <div>
-      <b>Câu ${current+1}/${questions.length}</b>
-      <span style="float:right">${Math.floor(time/60)}:${("0"+time%60).slice(-2)}</span>
+    <div class="topbar">
+      <span>Câu ${current+1}/${questions.length}</span>
+      <span>${Math.floor(time/60)}:${("0"+time%60).slice(-2)}</span>
     </div>
 
     <h3>${q.question}</h3>
 
-    ${["A","B","C","D"].map(k=>`
-      <button onclick="select('${k}')" style="display:block; margin:8px 0; width:100%">
+    ${["A","B","C","D"].map(k=>{
+      let cls = "answer";
+      if(answers[current]===k) cls += " selected";
+
+      if(finished){
+        if(k===q.correct) cls += " correct";
+        else if(answers[current]===k) cls += " wrong";
+      }
+
+      return `<div class="${cls}" onclick="select('${k}')">
         ${k}. ${q[k]}
-      </button>
-    `).join("")}
+      </div>`;
+    }).join("")}
 
     <div style="margin-top:20px">
-      <button onclick="prev()">⬅ Back</button>
-      <button onclick="next()">Next ➡</button>
+      <button onclick="prev()">⬅</button>
+      <button onclick="next()">➡</button>
       <button onclick="submit()">Nộp bài</button>
     </div>
   `;
+
+  renderSidebar();
 }
 
-// ✅ CHỌN ĐÁP ÁN
 function select(k){
+  if(finished) return;
   answers[current]=k;
+  render();
 }
 
-// 👉 NEXT
 function next(){
   if(current<questions.length-1) current++;
   render();
 }
 
-// 👉 BACK
 function prev(){
   if(current>0) current--;
   render();
 }
 
-// 📊 SUBMIT
-function submit(){
-  clearInterval(timer);
-  showResult();
+function go(i){
+  current=i;
+  render();
 }
 
-// 🎯 KẾT QUẢ
+function submit(){
+  finished = true;
+  clearInterval(timer);
+  render();
+}
+
 function showResult(){
   let score=0;
   questions.forEach((q,i)=>{
