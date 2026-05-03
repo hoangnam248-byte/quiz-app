@@ -2,92 +2,160 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Quiz PRO FINAL</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz Mobile PRO</title>
 
 <style>
-body { margin:0; font-family:Arial; display:flex; }
-
-#sidebar {
-  width:250px; height:100vh; overflow:auto;
-  background:#f4f4f4; padding:10px;
+body {
+  margin:0;
+  font-family:Arial;
+  background:#f5f5f5;
 }
 
-.q-btn {
-  width:40px; height:40px; margin:5px;
-  border:none; border-radius:6px; cursor:pointer;
-  background:#ddd;
+/* HEADER */
+.header {
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  background:white;
+  padding:10px;
+  box-shadow:0 2px 5px rgba(0,0,0,0.1);
+  z-index:10;
 }
-
-.current { background:#2196f3; color:white; }
-.correct-btn { background:#4caf50; color:white; }
-.wrong-btn { background:#f44336; color:white; }
-
-#main { flex:1; padding:20px; }
-
-.answer {
-  padding:12px; margin:10px 0;
-  border-radius:8px; border:1px solid #ccc;
-  cursor:pointer;
-  font-size:16px;
-}
-
-.correct { background:#4caf50; color:white; }
-.wrong { background:#f44336; color:white; }
 
 .topbar {
   display:flex;
   justify-content:space-between;
   font-weight:bold;
-  font-size:16px;
 }
 
+/* CONTENT */
+.container {
+  padding:80px 15px 100px;
+}
+
+/* PROGRESS */
 #progress {
-  height:10px;
+  height:6px;
   background:#ddd;
   border-radius:5px;
-  margin:10px 0;
+  margin-top:5px;
 }
 
 #progress-bar {
-  height:10px;
+  height:6px;
   background:#4caf50;
   width:0%;
   border-radius:5px;
 }
 
-/* 🔥 NÚT TO GẤP 3 */
-.big-btn {
-  padding:20px 30px;
-  font-size:20px;
-  margin:10px;
+/* QUESTION */
+.question {
+  background:white;
+  padding:15px;
   border-radius:10px;
+  margin-top:10px;
 }
 
-button {
-  padding:8px 12px;
+/* ANSWER */
+.answer {
+  background:white;
+  padding:15px;
+  margin:10px 0;
+  border-radius:10px;
+  border:1px solid #ddd;
+  font-size:16px;
+}
+
+.correct { background:#4caf50; color:white; }
+.wrong { background:#f44336; color:white; }
+.selected { border:2px solid #2196f3; }
+
+/* BUTTON NAV */
+.nav {
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  display:flex;
+  justify-content:space-around;
+  background:white;
+  padding:10px;
+  box-shadow:0 -2px 5px rgba(0,0,0,0.1);
+}
+
+.nav button {
+  flex:1;
+  margin:5px;
+  padding:15px;
+  font-size:18px;
+  border:none;
+  border-radius:10px;
+  background:#2196f3;
+  color:white;
+}
+
+/* SIDEBAR */
+#drawer {
+  position:fixed;
+  left:-100%;
+  top:0;
+  width:80%;
+  height:100%;
+  background:white;
+  transition:0.3s;
+  overflow:auto;
+  z-index:20;
+  padding:10px;
+}
+
+#drawer.open { left:0; }
+
+.q-btn {
+  width:40px;
+  height:40px;
+  margin:5px;
   border:none;
   border-radius:6px;
-  cursor:pointer;
+}
+
+.correct-btn { background:#4caf50; color:white; }
+.wrong-btn { background:#f44336; color:white; }
+.current { background:#2196f3; color:white; }
+
+/* MENU BUTTON */
+.menu {
+  position:fixed;
+  top:15px;
+  left:10px;
+  font-size:20px;
+  z-index:30;
 }
 </style>
 </head>
 
 <body>
 
-<div id="sidebar"></div>
+<div class="menu" onclick="toggleDrawer()">☰</div>
 
-<div id="main">
-  <h2>Quiz PRO</h2>
+<div id="drawer"></div>
 
-  <div>
-    <button onclick="startMode('practice')">Luyện tập</button>
-    <button onclick="startMode('exam')">Thi thật</button>
-    <button onclick="redoWrong()">Làm lại câu sai</button>
+<div class="header">
+  <div class="topbar">
+    <span id="info"></span>
+    <span id="score"></span>
+    <span id="time"></span>
   </div>
-
   <div id="progress"><div id="progress-bar"></div></div>
+</div>
 
-  <div id="app"></div>
+<div class="container" id="app"></div>
+
+<div class="nav">
+  <button onclick="prev()">⬅</button>
+  <button onclick="next()">➡</button>
+  <button onclick="submit()">Nộp</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -98,24 +166,30 @@ let questions = [];
 let current = 0;
 let answers = {};
 let wrongList = [];
+let mode = "practice";
 let time = 3600;
 let timer;
-let mode = "practice";
 
-// 👉 điểm realtime
+// 👉 score realtime
 function getScore(){
-  let score = 0;
+  let s=0;
   questions.forEach((q,i)=>{
-    if(answers[i] === q.correct) score++;
+    if(answers[i]===q.correct) s++;
   });
-  return score;
+  return s;
 }
 
+function toggleDrawer(){
+  document.getElementById("drawer").classList.toggle("open");
+}
+
+// START
 async function startMode(m){
   mode = m;
   await loadExcel();
 }
 
+// LOAD
 async function loadExcel(){
   const url = "https://raw.githubusercontent.com/hoangnam248-byte/quiz-app/main/data.xlsx";
 
@@ -127,7 +201,6 @@ async function loadExcel(){
   const json = XLSX.utils.sheet_to_json(sheet);
 
   allQuestions = json.map((r,i)=>({
-    id:i,
     question:r["Câu hỏi"],
     A:r["Đáp án A"],
     B:r["Đáp án B"],
@@ -136,9 +209,8 @@ async function loadExcel(){
     correct:r["Đáp án đúng"]
   }));
 
-  // 🔥 PHÂN CHẾ ĐỘ
-  if(mode === "practice"){
-    questions = [...allQuestions]; // 390 câu
+  if(mode==="practice"){
+    questions = [...allQuestions];
   } else {
     questions = [...allQuestions].sort(()=>Math.random()-0.5).slice(0,70);
   }
@@ -146,9 +218,9 @@ async function loadExcel(){
   startQuiz();
 }
 
+// START QUIZ
 function startQuiz(){
   answers = {};
-  wrongList = [];
   current = 0;
   time = 3600;
 
@@ -161,58 +233,43 @@ function startQuiz(){
   render();
 }
 
+// RENDER
 function render(){
-  const app = document.getElementById("app");
-
   if(time<=0){ submit(); return; }
 
   const q = questions[current];
 
-  // progress
-  const done = Object.keys(answers).length;
-  const percent = Math.floor((done/questions.length)*100);
+  document.getElementById("info").innerText = `Câu ${current+1}/${questions.length}`;
+  document.getElementById("score").innerText = `Điểm: ${getScore()}/${questions.length}`;
+  document.getElementById("time").innerText = `${Math.floor(time/60)}:${("0"+time%60).slice(-2)}`;
+
+  const percent = Math.floor((Object.keys(answers).length/questions.length)*100);
   document.getElementById("progress-bar").style.width = percent+"%";
 
-  app.innerHTML = `
-    <div class="topbar">
-      <span>Câu ${current+1}/${questions.length}</span>
-      <span>Điểm: ${getScore()} / ${questions.length}</span>
-      <span>${Math.floor(time/60)}:${("0"+time%60).slice(-2)}</span>
-    </div>
-
-    <h3>${q.question}</h3>
-
+  document.getElementById("app").innerHTML = `
+    <div class="question">${q.question}</div>
     ${["A","B","C","D"].map(k=>{
       let cls="answer";
+
+      if(answers[current]===k) cls+=" selected";
 
       if(mode==="practice" && answers[current]){
         if(k===q.correct) cls+=" correct";
         if(answers[current]===k && k!==q.correct) cls+=" wrong";
       }
 
-      if(mode==="exam" && answers[current]===k){
-        cls+=" correct-btn";
-      }
-
-      return `<div class="${cls}" onclick="select('${k}')">
-        ${k}. ${q[k]}
-      </div>`;
+      return `<div class="${cls}" onclick="select('${k}')">${k}. ${q[k]}</div>`;
     }).join("")}
-
-    <div>
-      <button class="big-btn" onclick="prev()">⬅</button>
-      <button class="big-btn" onclick="next()">➡</button>
-      <button onclick="submit()">Nộp bài</button>
-    </div>
   `;
 
   renderSidebar();
 }
 
+// SIDEBAR
 function renderSidebar(){
-  const sb = document.getElementById("sidebar");
+  const d = document.getElementById("drawer");
 
-  sb.innerHTML = questions.map((q,i)=>{
+  d.innerHTML = questions.map((q,i)=>{
     let cls="q-btn";
 
     if(i===current) cls+=" current";
@@ -226,6 +283,7 @@ function renderSidebar(){
   }).join("");
 }
 
+// ACTION
 function select(k){
   if(mode==="practice" && answers[current]) return;
   answers[current]=k;
@@ -234,35 +292,22 @@ function select(k){
 
 function next(){ if(current<questions.length-1) current++; render(); }
 function prev(){ if(current>0) current--; render(); }
-function go(i){ current=i; render(); }
+function go(i){ current=i; toggleDrawer(); render(); }
 
+// SUBMIT
 function submit(){
   clearInterval(timer);
 
-  let score=0;
-  wrongList=[];
-
-  questions.forEach((q,i)=>{
-    if(answers[i]===q.correct) score++;
-    else wrongList.push(q);
-  });
+  let score = getScore();
 
   document.getElementById("app").innerHTML = `
     <h2>Kết quả</h2>
     <h3>${score}/${questions.length}</h3>
-    <button onclick="redoWrong()">Làm lại câu sai</button>
   `;
 }
 
-function redoWrong(){
-  if(wrongList.length===0){
-    alert("Không có câu sai!");
-    return;
-  }
-  questions = wrongList;
-  current=0;
-  startQuiz();
-}
+// START DEFAULT
+startMode("practice");
 </script>
 
 </body>
