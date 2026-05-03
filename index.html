@@ -33,7 +33,11 @@ body { margin:0; font-family:Arial; display:flex; }
 .correct { background:#4caf50; color:white; }
 .wrong { background:#f44336; color:white; }
 
-.topbar { display:flex; justify-content:space-between; }
+.topbar {
+  display:flex;
+  justify-content:space-between;
+  font-weight:bold;
+}
 
 #progress {
   height:10px;
@@ -65,7 +69,6 @@ button {
 <div id="main">
   <h2>Quiz PRO</h2>
 
-  <!-- chọn chế độ -->
   <div>
     <button onclick="startMode('practice')">Luyện tập</button>
     <button onclick="startMode('exam')">Thi thật</button>
@@ -86,8 +89,16 @@ let answers = {};
 let wrongList = [];
 let time = 3600;
 let timer;
-let mode = "practice"; // practice | exam
-let finished = false;
+let mode = "practice";
+
+// 👉 TÍNH ĐIỂM REALTIME
+function getScore(){
+  let score = 0;
+  questions.forEach((q,i)=>{
+    if(answers[i] === q.correct) score++;
+  });
+  return score;
+}
 
 async function startMode(m){
   mode = m;
@@ -115,7 +126,7 @@ async function loadExcel(){
   }));
 
   questions.sort(()=>Math.random()-0.5);
-  questions = questions.slice(0,70); // 70 câu
+  questions = questions.slice(0,70);
 
   startQuiz();
 }
@@ -124,7 +135,6 @@ function startQuiz(){
   answers = {};
   wrongList = [];
   current = 0;
-  finished = false;
   time = 3600;
 
   clearInterval(timer);
@@ -143,7 +153,7 @@ function render(){
 
   const q = questions[current];
 
-  // progress %
+  // progress
   const done = Object.keys(answers).length;
   const percent = Math.floor((done/questions.length)*100);
   document.getElementById("progress-bar").style.width = percent+"%";
@@ -151,6 +161,7 @@ function render(){
   app.innerHTML = `
     <div class="topbar">
       <span>Câu ${current+1}/${questions.length}</span>
+      <span>Điểm: ${getScore()} / ${questions.length}</span>
       <span>${Math.floor(time/60)}:${("0"+time%60).slice(-2)}</span>
     </div>
 
@@ -159,11 +170,13 @@ function render(){
     ${["A","B","C","D"].map(k=>{
       let cls="answer";
 
+      // 👉 Luyện tập: hiện đúng sai ngay
       if(mode==="practice" && answers[current]){
         if(k===q.correct) cls+=" correct";
         if(answers[current]===k && k!==q.correct) cls+=" wrong";
       }
 
+      // 👉 Thi thật: chỉ highlight đã chọn
       if(mode==="exam" && answers[current]===k){
         cls+=" correct-btn";
       }
@@ -189,13 +202,9 @@ function renderSidebar(){
 
     if(i===current) cls+=" current";
 
-    if(mode==="practice" && answers[i]){
+    if(answers[i]){
       if(answers[i]===q.correct) cls+=" correct-btn";
       else cls+=" wrong-btn";
-    }
-
-    if(mode==="exam" && answers[i]){
-      cls+=" correct-btn";
     }
 
     return `<button class="${cls}" onclick="go(${i})">${i+1}</button>`;
@@ -213,7 +222,6 @@ function prev(){ if(current>0) current--; render(); }
 function go(i){ current=i; render(); }
 
 function submit(){
-  finished=true;
   clearInterval(timer);
 
   let score=0;
