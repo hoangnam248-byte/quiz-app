@@ -3,151 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Quiz Mobile PRO</title>
+<title>Quiz PRO MAX</title>
 
 <style>
-body {
-  margin:0;
-  font-family:Arial;
-  background:#f5f5f5;
-}
+body { margin:0; font-family:Arial; background:#f5f5f5; }
+.dark { background:#121212; color:#fff; }
 
-/* HEADER */
 .header {
-  position:fixed;
-  top:0;
-  left:0;
-  right:0;
-  background:white;
-  padding:10px;
+  position:fixed; top:0; left:0; right:0;
+  background:white; padding:10px;
   box-shadow:0 2px 5px rgba(0,0,0,0.1);
-  z-index:10;
 }
+.dark .header { background:#1e1e1e; }
 
-.topbar {
-  display:flex;
-  justify-content:space-between;
-  font-weight:bold;
-}
+.container { padding:80px 15px 120px; }
 
-/* CONTENT */
-.container {
-  padding:80px 15px 100px;
-}
-
-/* PROGRESS */
-#progress {
-  height:6px;
-  background:#ddd;
-  border-radius:5px;
-  margin-top:5px;
-}
-
-#progress-bar {
-  height:6px;
-  background:#4caf50;
-  width:0%;
-  border-radius:5px;
-}
-
-/* QUESTION */
-.question {
-  background:white;
-  padding:15px;
-  border-radius:10px;
-  margin-top:10px;
-}
-
-/* ANSWER */
 .answer {
-  background:white;
-  padding:15px;
-  margin:10px 0;
-  border-radius:10px;
-  border:1px solid #ddd;
-  font-size:16px;
+  padding:15px; margin:10px 0;
+  border-radius:10px; border:1px solid #ddd;
 }
 
 .correct { background:#4caf50; color:white; }
 .wrong { background:#f44336; color:white; }
-.selected { border:2px solid #2196f3; }
+.bookmark { border:2px solid gold; }
 
-/* BUTTON NAV */
 .nav {
-  position:fixed;
-  bottom:0;
-  left:0;
-  right:0;
-  display:flex;
-  justify-content:space-around;
-  background:white;
-  padding:10px;
-  box-shadow:0 -2px 5px rgba(0,0,0,0.1);
+  position:fixed; bottom:0; left:0; right:0;
+  display:flex; background:white;
 }
-
 .nav button {
-  flex:1;
-  margin:5px;
-  padding:15px;
+  flex:1; padding:15px;
   font-size:18px;
-  border:none;
-  border-radius:10px;
-  background:#2196f3;
-  color:white;
 }
 
-/* SIDEBAR */
-#drawer {
-  position:fixed;
-  left:-100%;
-  top:0;
-  width:80%;
-  height:100%;
-  background:white;
-  transition:0.3s;
-  overflow:auto;
-  z-index:20;
-  padding:10px;
-}
-
-#drawer.open { left:0; }
-
-.q-btn {
-  width:40px;
-  height:40px;
-  margin:5px;
-  border:none;
-  border-radius:6px;
-}
-
-.correct-btn { background:#4caf50; color:white; }
-.wrong-btn { background:#f44336; color:white; }
-.current { background:#2196f3; color:white; }
-
-/* MENU BUTTON */
-.menu {
-  position:fixed;
-  top:15px;
-  left:10px;
-  font-size:20px;
-  z-index:30;
-}
+.progress { height:6px; background:#ddd; }
+.bar { height:6px; background:#4caf50; width:0%; }
 </style>
 </head>
 
 <body>
 
-<div class="menu" onclick="toggleDrawer()">☰</div>
-
-<div id="drawer"></div>
-
 <div class="header">
-  <div class="topbar">
-    <span id="info"></span>
-    <span id="score"></span>
-    <span id="time"></span>
-  </div>
-  <div id="progress"><div id="progress-bar"></div></div>
+  <div id="info"></div>
+  <div class="progress"><div id="bar" class="bar"></div></div>
 </div>
 
 <div class="container" id="app"></div>
@@ -161,16 +59,34 @@ body {
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <script>
+// ================= STATE =================
 let allQuestions = [];
 let questions = [];
-let current = 0;
 let answers = {};
+let bookmarks = {};
 let wrongList = [];
+let current = 0;
 let mode = "practice";
+let user = localStorage.getItem("user") || prompt("Nhập tên:");
+localStorage.setItem("user", user);
+
 let time = 3600;
 let timer;
 
-// 👉 score realtime
+// ================= SOUND =================
+function playSound(type){
+  let audio = new Audio(type==="correct"
+    ? "https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"
+    : "https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+  audio.play();
+}
+
+// ================= VIBRATE =================
+function vibrate(){
+  if(navigator.vibrate) navigator.vibrate(100);
+}
+
+// ================= SCORE =================
 function getScore(){
   let s=0;
   questions.forEach((q,i)=>{
@@ -179,28 +95,17 @@ function getScore(){
   return s;
 }
 
-function toggleDrawer(){
-  document.getElementById("drawer").classList.toggle("open");
-}
-
-// START
-async function startMode(m){
-  mode = m;
-  await loadExcel();
-}
-
-// LOAD
+// ================= LOAD =================
 async function loadExcel(){
   const url = "https://raw.githubusercontent.com/hoangnam248-byte/quiz-app/main/data.xlsx";
-
   const res = await fetch(url);
-  const buffer = await res.arrayBuffer();
+  const buf = await res.arrayBuffer();
 
-  const wb = XLSX.read(buffer, {type:'array'});
+  const wb = XLSX.read(buf,{type:'array'});
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const json = XLSX.utils.sheet_to_json(sheet);
 
-  allQuestions = json.map((r,i)=>({
+  allQuestions = json.map((r)=>({
     question:r["Câu hỏi"],
     A:r["Đáp án A"],
     B:r["Đáp án B"],
@@ -209,20 +114,19 @@ async function loadExcel(){
     correct:r["Đáp án đúng"]
   }));
 
+  startQuiz();
+}
+
+// ================= START =================
+function startQuiz(){
   if(mode==="practice"){
     questions = [...allQuestions];
   } else {
     questions = [...allQuestions].sort(()=>Math.random()-0.5).slice(0,70);
   }
 
-  startQuiz();
-}
-
-// START QUIZ
-function startQuiz(){
-  answers = {};
+  answers = JSON.parse(localStorage.getItem("answers")||"{}");
   current = 0;
-  time = 3600;
 
   clearInterval(timer);
   timer = setInterval(()=>{
@@ -233,81 +137,146 @@ function startQuiz(){
   render();
 }
 
-// RENDER
+// ================= RENDER =================
 function render(){
-  if(time<=0){ submit(); return; }
-
   const q = questions[current];
 
-  document.getElementById("info").innerText = `Câu ${current+1}/${questions.length}`;
-  document.getElementById("score").innerText = `Điểm: ${getScore()}/${questions.length}`;
-  document.getElementById("time").innerText = `${Math.floor(time/60)}:${("0"+time%60).slice(-2)}`;
+  document.getElementById("info").innerHTML =
+    `${user} | Câu ${current+1}/${questions.length} | Điểm: ${getScore()}`;
 
-  const percent = Math.floor((Object.keys(answers).length/questions.length)*100);
-  document.getElementById("progress-bar").style.width = percent+"%";
+  document.getElementById("bar").style.width =
+    (Object.keys(answers).length/questions.length*100)+"%";
 
   document.getElementById("app").innerHTML = `
-    <div class="question">${q.question}</div>
+    <h3>${q.question}</h3>
+
     ${["A","B","C","D"].map(k=>{
       let cls="answer";
 
-      if(answers[current]===k) cls+=" selected";
+      if(bookmarks[current]) cls+=" bookmark";
 
-      if(mode==="practice" && answers[current]){
+      if(answers[current]){
         if(k===q.correct) cls+=" correct";
         if(answers[current]===k && k!==q.correct) cls+=" wrong";
       }
 
       return `<div class="${cls}" onclick="select('${k}')">${k}. ${q[k]}</div>`;
     }).join("")}
+
+    <button onclick="toggleBookmark()">⭐ Bookmark</button>
+    <button onclick="jumpUnanswered()">⏭️ Câu chưa làm</button>
+    <button onclick="toggleDark()">🌙 Dark</button>
   `;
-
-  renderSidebar();
 }
 
-// SIDEBAR
-function renderSidebar(){
-  const d = document.getElementById("drawer");
-
-  d.innerHTML = questions.map((q,i)=>{
-    let cls="q-btn";
-
-    if(i===current) cls+=" current";
-
-    if(answers[i]){
-      if(answers[i]===q.correct) cls+=" correct-btn";
-      else cls+=" wrong-btn";
-    }
-
-    return `<button class="${cls}" onclick="go(${i})">${i+1}</button>`;
-  }).join("");
-}
-
-// ACTION
+// ================= ACTION =================
 function select(k){
-  if(mode==="practice" && answers[current]) return;
+  if(answers[current]) return;
+
   answers[current]=k;
+  localStorage.setItem("answers", JSON.stringify(answers));
+
+  if(k===questions[current].correct){
+    playSound("correct");
+  } else {
+    playSound("wrong");
+  }
+
+  vibrate();
   render();
 }
 
 function next(){ if(current<questions.length-1) current++; render(); }
 function prev(){ if(current>0) current--; render(); }
-function go(i){ current=i; toggleDrawer(); render(); }
 
-// SUBMIT
+function toggleBookmark(){
+  bookmarks[current]=!bookmarks[current];
+  render();
+}
+
+function jumpUnanswered(){
+  for(let i=0;i<questions.length;i++){
+    if(!answers[i]){ current=i; break; }
+  }
+  render();
+}
+
+// ================= SUBMIT =================
 function submit(){
   clearInterval(timer);
 
   let score = getScore();
 
+  // save history
+  let history = JSON.parse(localStorage.getItem("history")||"[]");
+  history.push({
+    user, score,
+    total:questions.length,
+    time:new Date().toLocaleString()
+  });
+  localStorage.setItem("history", JSON.stringify(history));
+
+  wrongList = questions.filter((q,i)=>answers[i]!==q.correct);
+
   document.getElementById("app").innerHTML = `
     <h2>Kết quả</h2>
     <h3>${score}/${questions.length}</h3>
+
+    <canvas id="chart" width="300" height="200"></canvas>
+
+    <button onclick="redoWrong()">Làm lại câu sai</button>
+    <button onclick="viewDetail()">Xem chi tiết</button>
+    <button onclick="viewHistory()">Lịch sử</button>
   `;
+
+  drawChart(score);
 }
 
-// START DEFAULT
-startMode("practice");
+// ================= CHART =================
+function drawChart(score){
+  const c = document.getElementById("chart");
+  const ctx = c.getContext("2d");
+
+  ctx.fillStyle="green";
+  ctx.fillRect(50,200-score*3,50,score*3);
+
+  ctx.fillStyle="red";
+  ctx.fillRect(150,200-(questions.length-score)*3,50,(questions.length-score)*3);
+}
+
+// ================= DETAIL =================
+function viewDetail(){
+  document.getElementById("app").innerHTML =
+    questions.map((q,i)=>`
+      <div>
+        ${i+1}. ${q.question} <br>
+        ✔ ${q.correct} | Bạn chọn: ${answers[i]||"-"}
+      </div><hr>
+    `).join("");
+}
+
+// ================= HISTORY =================
+function viewHistory(){
+  let h = JSON.parse(localStorage.getItem("history")||"[]");
+  document.getElementById("app").innerHTML =
+    h.map(x=>`👤 ${x.user} - ${x.score}/${x.total} (${x.time})`).join("<br>");
+}
+
+// ================= REDO =================
+function redoWrong(){
+  questions = wrongList;
+  answers={};
+  current=0;
+  render();
+}
+
+// ================= DARK =================
+function toggleDark(){
+  document.body.classList.toggle("dark");
+}
+
+// ================= INIT =================
+loadExcel();
 </script>
 
 </body>
