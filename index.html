@@ -4,12 +4,13 @@
   <meta charset="UTF-8">
   <title>Quiz App</title>
 </head>
+
 <body style="font-family: Arial; padding:20px">
 
-<h2>Upload file Excel để bắt đầu</h2>
-<input type="file" id="file" />
+<h2>Thi trắc nghiệm</h2>
+<button onclick="loadExcel()">Bắt đầu thi</button>
 
-<div id="app"></div>
+<div id="app" style="margin-top:20px"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
@@ -20,29 +21,34 @@ let answers = {};
 let time = 1800;
 let timer;
 
-document.getElementById('file').addEventListener('change', function(e){
-  const reader = new FileReader();
-  reader.onload = function(evt){
-    const data = new Uint8Array(evt.target.result);
-    const workbook = XLSX.read(data, {type:'array'});
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const json = XLSX.utils.sheet_to_json(sheet);
+// 🔥 LOAD EXCEL TỪ GITHUB
+async function loadExcel(){
+  const url = "https://raw.githubusercontent.com/hoangnam248-byte/quiz-app/main/data.xlsx";
 
-    questions = json.map((r,i)=>({
-      id:i,
-      question:r["Câu hỏi"],
-      A:r["Đáp án A"],
-      B:r["Đáp án B"],
-      C:r["Đáp án C"],
-      D:r["Đáp án D"],
-      correct:r["Đáp án đúng"]
-    }));
+  const res = await fetch(url);
+  const arrayBuffer = await res.arrayBuffer();
 
-    startQuiz();
-  };
-  reader.readAsArrayBuffer(e.target.files[0]);
-});
+  const workbook = XLSX.read(arrayBuffer, {type:'array'});
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const json = XLSX.utils.sheet_to_json(sheet);
 
+  questions = json.map((r,i)=>({
+    id:i,
+    question:r["Câu hỏi"],
+    A:r["Đáp án A"],
+    B:r["Đáp án B"],
+    C:r["Đáp án C"],
+    D:r["Đáp án D"],
+    correct:r["Đáp án đúng"]
+  }));
+
+  // random câu hỏi
+  questions.sort(() => Math.random() - 0.5);
+
+  startQuiz();
+}
+
+// ⏱️ TIMER
 function startQuiz(){
   timer = setInterval(()=>{
     time--;
@@ -51,6 +57,7 @@ function startQuiz(){
   render();
 }
 
+// 🧠 HIỂN THỊ
 function render(){
   const app = document.getElementById('app');
 
@@ -66,35 +73,47 @@ function render(){
       <b>Câu ${current+1}/${questions.length}</b>
       <span style="float:right">${Math.floor(time/60)}:${("0"+time%60).slice(-2)}</span>
     </div>
+
     <h3>${q.question}</h3>
+
     ${["A","B","C","D"].map(k=>`
-      <button onclick="select('${k}')">${k}. ${q[k]}</button><br><br>
+      <button onclick="select('${k}')" style="display:block; margin:8px 0; width:100%">
+        ${k}. ${q[k]}
+      </button>
     `).join("")}
-    <button onclick="prev()">Back</button>
-    <button onclick="next()">Next</button>
-    <button onclick="submit()">Submit</button>
+
+    <div style="margin-top:20px">
+      <button onclick="prev()">⬅ Back</button>
+      <button onclick="next()">Next ➡</button>
+      <button onclick="submit()">Nộp bài</button>
+    </div>
   `;
 }
 
+// ✅ CHỌN ĐÁP ÁN
 function select(k){
   answers[current]=k;
 }
 
+// 👉 NEXT
 function next(){
   if(current<questions.length-1) current++;
   render();
 }
 
+// 👉 BACK
 function prev(){
   if(current>0) current--;
   render();
 }
 
+// 📊 SUBMIT
 function submit(){
   clearInterval(timer);
   showResult();
 }
 
+// 🎯 KẾT QUẢ
 function showResult(){
   let score=0;
   questions.forEach((q,i)=>{
